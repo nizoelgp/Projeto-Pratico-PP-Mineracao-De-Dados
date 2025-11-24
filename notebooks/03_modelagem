@@ -1,0 +1,262 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "5d1a716c",
+   "metadata": {},
+   "source": [
+    "# 03 - Modelagem e Machine Learning para Previsão de Preços"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "7bcdab91",
+   "metadata": {},
+   "source": [
+    "Este notebook é dedicado à fase de **Modelagem e Machine Learning** do projeto de previsão de preços. Aqui, iremos preparar os dados finais, treinar diferentes modelos de regressão, avaliar seu desempenho e selecionar o melhor modelo para a previsão da variável alvo (`preco`)."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "aa8f94c6",
+   "metadata": {},
+   "source": [
+    "## 1. Configuração e Importações"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "b05793c9",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Importações de bibliotecas\n",
+    "import pandas as pd\n",
+    "import numpy as np\n",
+    "import matplotlib.pyplot as plt\n",
+    "import seaborn as sns\n",
+    "from sklearn.model_selection import train_test_split\n",
+    "from sklearn.linear_model import LinearRegression\n",
+    "from sklearn.ensemble import RandomForestRegressor\n",
+    "from sklearn.metrics import mean_squared_error, r2_score\n",
+    "from sklearn.preprocessing import StandardScaler, OneHotEncoder\n",
+    "from sklearn.compose import ColumnTransformer\n",
+    "from sklearn.pipeline import Pipeline\n",
+    "import joblib # Para salvar o modelo\n",
+    "\n",
+    "# Configurações\n",
+    "pd.set_option('display.max_columns', None)\n",
+    "np.random.seed(42)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "09448d94",
+   "metadata": {},
+   "source": [
+    "## 2. Carregamento e Preparação dos Dados"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "7dc0906d",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Caminho do arquivo de dados processados (assumindo a estrutura de diretórios)\n",
+    "DATA_PATH = 'data/processed/dados_para_modelagem.csv'\n",
+    "\n",
+    "try:\n",
+    "    df = pd.read_csv(DATA_PATH)\n",
+    "    print(f'Dados carregados com sucesso. Linhas: {df.shape[0]}, Colunas: {df.shape[1]}')\n",
+    "    print('\\nPrimeiras 5 linhas:')\n",
+    "    print(df.head())\n",
+    "except FileNotFoundError:\n",
+    "    print(f'ERRO: Arquivo não encontrado em {DATA_PATH}. Certifique-se de que o notebook 02_analise_exploratoria.ipynb foi executado.')\n",
+    "    # Cria um DataFrame de exemplo para evitar quebra total, caso o arquivo real não exista\n",
+    "    df = pd.DataFrame({\n",
+    "        'feature_1': [10.5, 12.1, 9.8, 15.0, 11.2],\n",
+    "        'feature_2': [200, 250, 180, 300, 220],\n",
+    "        'feature_3': [5, 6, 4, 7, 5],\n",
+    "        'preco': [150000, 180000, 135000, 220000, 165000]\n",
+    "    })\n",
+    "    print('\\nUsando dados de exemplo para demonstração.')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "49f15b85",
+   "metadata": {},
+   "source": [
+    "## 3. Separação de Variáveis e Conjuntos de Treino/Teste"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "3833dd29",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Variável alvo\n",
+    "TARGET = 'preco'\n",
+    "\n",
+    "# Separar features (X) e alvo (y)\n",
+    "X = df.drop(columns=[TARGET])\n",
+    "y = df[TARGET]\n",
+    "\n",
+    "# Separar em conjuntos de treino e teste\n",
+    "X_train, X_test, y_train, y_test = train_test_split(\n",
+    "    X, y, test_size=0.2, random_state=42\n",
+    ")\n",
+    "\n",
+    "print(f'X_train shape: {X_train.shape}')\n",
+    "print(f'X_test shape: {X_test.shape}')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "6cd48b46",
+   "metadata": {},
+   "source": [
+    "## 4. Pré-processamento e Pipeline (Exemplo)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "1c847fba",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Identificar colunas numéricas e categóricas (ajustar conforme o projeto real)\n",
+    "numeric_features = X.select_dtypes(include=np.number).columns.tolist()\n",
+    "categorical_features = X.select_dtypes(include='object').columns.tolist()\n",
+    "\n",
+    "# Criar transformadores\n",
+    "numeric_transformer = Pipeline(steps=[\n",
+    "    ('scaler', StandardScaler())\n",
+    "])\n",
+    "\n",
+    "# Se houver colunas categóricas, adicionar OneHotEncoder\n",
+    "if categorical_features:\n",
+    "    categorical_transformer = Pipeline(steps=[\n",
+    "        ('onehot', OneHotEncoder(handle_unknown='ignore'))\n",
+    "    ])\n",
+    "    preprocessor = ColumnTransformer(\n",
+    "        transformers=[\n",
+    "            ('num', numeric_transformer, numeric_features),\n",
+    "            ('cat', categorical_transformer, categorical_features)\n",
+    "        ])\n",
+    "else:\n",
+    "    preprocessor = ColumnTransformer(\n",
+    "        transformers=[\n",
+    "            ('num', numeric_transformer, numeric_features)\n",
+    "        ],\n",
+    "        remainder='passthrough'\n",
+    "    )"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "b1c9ba25",
+   "metadata": {},
+   "source": [
+    "## 5. Treinamento e Avaliação de Modelos"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "c0ab3ad8",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# 5.1. Modelo de Regressão Linear\n",
+    "lr_model = Pipeline(steps=[('preprocessor', preprocessor),\n",
+    "                           ('regressor', LinearRegression())])\n",
+    "\n",
+    "lr_model.fit(X_train, y_train)\n",
+    "lr_predictions = lr_model.predict(X_test)\n",
+    "\n",
+    "# 5.2. Modelo de Random Forest\n",
+    "rf_model = Pipeline(steps=[('preprocessor', preprocessor),\n",
+    "                           ('regressor', RandomForestRegressor(n_estimators=100, random_state=42))])\n",
+    "\n",
+    "rf_model.fit(X_train, y_train)\n",
+    "rf_predictions = rf_model.predict(X_test)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "a255eba5",
+   "metadata": {},
+   "source": [
+    "## 6. Avaliação de Desempenho"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "f5b66c8a",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def evaluate_model(y_true, y_pred, model_name):\n",
+    "    mse = mean_squared_error(y_true, y_pred)\n",
+    "    rmse = np.sqrt(mse)\n",
+    "    r2 = r2_score(y_true, y_pred)\n",
+    "\n",
+    "    print(f'--- {model_name} ---')\n",
+    "    print(f'MSE: {mse:.2f}')\n",
+    "    print(f'RMSE: {rmse:.2f}')\n",
+    "    print(f'R²: {r2:.4f}')\n",
+    "    print('-' * 20)\n",
+    "    return {'Model': model_name, 'MSE': mse, 'RMSE': rmse, 'R2': r2}\n",
+    "\n",
+    "# Avaliar os modelos\n",
+    "lr_metrics = evaluate_model(y_test, lr_predictions, 'Regressão Linear')\n",
+    "rf_metrics = evaluate_model(y_test, rf_predictions, 'Random Forest')\n",
+    "\n",
+    "# Comparar resultados\n",
+    "results_df = pd.DataFrame([lr_metrics, rf_metrics])\n",
+    "print('\\nComparação de Modelos:')\n",
+    "print(results_df.sort_values(by='R2', ascending=False))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "afe03d7a",
+   "metadata": {},
+   "source": [
+    "## 7. Seleção e Salvamento do Modelo"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "39f6db97",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Exemplo: Selecionar o modelo com o maior R² (neste caso, Random Forest)\n",
+    "# O modelo Random Forest geralmente tem melhor desempenho em dados não lineares\n",
+    "best_model = rf_model\n",
+    "model_filename = 'best_model.joblib'\n",
+    "\n",
+    "# Salvar o modelo\n",
+    "joblib.dump(best_model, model_filename)\n",
+    "print(f'Modelo selecionado (Random Forest) salvo como {model_filename}')"
+   ]
+  }
+ ],
+ "metadata": {
+  "language_info": {
+   "name": "python"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
